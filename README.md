@@ -46,9 +46,9 @@ conda env create -f environment.yml
 conda activate genai
 </pre>
 ### Step 2: Preprocessing
-Download the CelebA dataset and place images under ./data/img_align_celeba/
-You can find the CelebA dataset here: https://www.kaggle.com/datasets/jessicali9530/celeba-dataset
-Preprocess images using multiprocessing: 
+- Download the CelebA dataset and place images under ./data/img_align_celeba/
+- You can find the CelebA dataset here: https://www.kaggle.com/datasets/jessicali9530/celeba-dataset
+- Preprocess images using multiprocessing: 
 <pre>
 python preprocess.py
 </pre>
