@@ -63,6 +63,6 @@ You can submit a jobscript to allocate a A100/H100 on quest to train.
 sbatch jobscript_train.sh
 </pre>
 The model will:
-	•	Train on 30,000 CelebA samples by default
-	•	Save checkpoints every 10 epochs to checkpoints/
-	•	Output loss visualization to output/
+- Train on 30,000 CelebA samples by default
+- Save checkpoints every 10 epochs to checkpoints/
+- Output loss visualization to output/
