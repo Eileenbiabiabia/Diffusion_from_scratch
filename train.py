@@ -20,7 +20,7 @@ from tqdm import tqdm
 from typing import List
 from datetime import datetime
 
-
+# Custom dataset class to load CelebA tensor files saved as .pt
 class CelebaTensorDataset(Dataset):
     def __init__(self, tensor_dir):
         self.tensor_dir = tensor_dir
@@ -35,6 +35,10 @@ class CelebaTensorDataset(Dataset):
     def __getitem__(self, idx):
         return torch.load(os.path.join(self.tensor_dir, self.files[idx]))
 
+
+# Training function for DDPM with UNet backbone
+
+# Supports checkpoint loading, EMA tracking, and periodic saving
 def train(batch_size: int=128,
           num_time_steps: int=1000,
           num_epochs: int=15,
@@ -42,21 +46,21 @@ def train(batch_size: int=128,
           ema_decay: float=0.9999,  
           lr=2e-5,
           checkpoint_path: str=None, output_dir: str='output'):
+    # Set random seed for reproducibility
     set_seed(random.randint(0, 2**32-1)) if seed == -1 else set_seed(seed)
-
+    # Load training dataset (CelebA tensor images)
     train_dataset = CelebaTensorDataset('./data/celeba_tensor64')
-    subset = torch.utils.data.Subset(train_dataset, range(60000)) 
+    subset = torch.utils.data.Subset(train_dataset, range(30000)) 
     train_loader = DataLoader(subset, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=4)
-    #train_dataset = datasets.MNIST(root='./data', train=True, download=True,transform=transforms.ToTensor())
-    #sub_dataset = Subset(train_dataset, list(range(1024)))
-    #train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=4)
 
+    # Initialize DDPM scheduler for noise schedule
     scheduler = DDPM_Scheduler(num_time_steps=num_time_steps)
-
+    
     #model = nn.DataParallel(UNET(input_channels=3, output_channels=3)).cuda()
     model = UNET(input_channels=3, output_channels=3).cuda()
     optimizer = optim.Adam(model.parameters(), lr=lr)
     ema = ModelEmaV3(model, decay=ema_decay)
+    # Load checkpoint if available
     if checkpoint_path is not None:
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint['weights'])
@@ -69,30 +73,37 @@ def train(batch_size: int=128,
         total_loss = 0
         for bidx, x in enumerate(tqdm(train_loader, desc=f"Epoch {i+1}/{num_epochs}",mininterval=15.0)):
             x = x.cuda()
-            # x = F.pad(x, (2,2,2,2))
+            # Sample random timestep t for each image
             t = torch.randint(0,num_time_steps,(batch_size,))
-            e = torch.randn_like(x, requires_grad=False)
+            e = torch.randn_like(x, requires_grad=False)  # True noise
             a = scheduler.alpha[t].view(batch_size,1,1,1).cuda()
-            x = (torch.sqrt(a)*x) + (torch.sqrt(1-a)*e)
+            x = (torch.sqrt(a)*x) + (torch.sqrt(1-a)*e)  # Add noise to image
+            # Model predicts noise from noisy image
             output = model(x, t)
             optimizer.zero_grad()
-            loss = criterion(output, e)
+            loss = criterion(output, e)  # Compare prediction to actual noise
             total_loss += loss.item()
             loss.backward()
             optimizer.step()
-            ema.update(model)
-        avg_epoch_loss = total_loss / len(train_loader) # Calculate average loss correctly
+            ema.update(model)  # Update EMA model
+        avg_epoch_loss = total_loss / len(train_loader)
         epoch_losses.append(avg_epoch_loss)
         print(f'Epoch {i+1} | Loss {avg_epoch_loss:.5f}')
-
-    checkpoint = {
-        'weights': model.state_dict(),
-        'optimizer': optimizer.state_dict(),
-        'ema': ema.state_dict()
-    }
-    torch.save(checkpoint, 'checkpoints/ddpm_checkpoint_150')
+        if (i + 1) % 10 == 0 or (i + 1) == num_epochs:
+            torch.save({
+                'weights': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'ema': ema.state_dict()
+            }, f'checkpoints/ddpm_checkpoint_epoch_{i+1}.pth')
+    # checkpoint = {
+    #     'weights': model.state_dict(),
+    #     'optimizer': optimizer.state_dict(),
+    #     'ema': ema.state_dict()
+    # }
+    # torch.save(checkpoint, 'checkpoints/ddpm_checkpoint_150')
     loss_figure(num_epochs,epoch_losses, output_dir)
 
+# Plot loss after training
 def loss_figure(num_epochs:int, epoch_losses: List, output_dir: str):
     plt.figure()
     plt.plot(range(1, num_epochs + 1), epoch_losses, marker='o')
@@ -104,13 +115,13 @@ def loss_figure(num_epochs:int, epoch_losses: List, output_dir: str):
     plt.savefig(loss_plot_path)
     plt.close()
 
+
+# Inference function to generate images from random noise
 def inference(checkpoint_path: str=None,
               num_time_steps: int=1000,
               ema_decay: float=0.9999, output_dir: str='output'):
-    # test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transforms.ToTensor())
-
     # load checkpoint
-    checkpoint = torch.load(checkpoint_path)
+    # checkpoint = torch.load(checkpoint_path)
     # Because we use DataParallel, the model's state_dict keys have "module." prefix in the checkpoint. 
     # We need to remove it before loading the state_dict.
     # new_state_dict = {}
@@ -130,6 +141,7 @@ def inference(checkpoint_path: str=None,
     ema = ModelEmaV3(model, decay=ema_decay)
     ema.load_state_dict(checkpoint['ema'])
     scheduler = DDPM_Scheduler(num_time_steps=num_time_steps)
+    # Key timesteps to visualize
     times = [0,15,50,100,200,300,400,550,700,999]
     images = []
     print("Starting inference process...")
@@ -184,11 +196,11 @@ def main():
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')
     output_dir = f'output/{timestamp}'
     os.makedirs(output_dir, exist_ok=True)
-    #train(checkpoint_path='checkpoints/ddpm_checkpoint_150', lr=2e-6, num_epochs=0, output_dir=output_dir)
-    train(checkpoint_path=None, lr=2e-6, num_epochs=150, output_dir=output_dir)
-    print("Training finished. Starting inference...")
-    inference('checkpoints/ddpm_checkpoint_150', output_dir=output_dir)
-    print("Inference finished. Congradulations!")
+    #train(checkpoint_path='checkpoints/ddpm_checkpoint_epoch_10.pth', lr=2e-6, num_epochs=50, output_dir=output_dir)
+    train(checkpoint_path=None, lr=2e-6, num_epochs=50, output_dir=output_dir)
+    #print("Training finished. Starting inference...")
+    #inference('checkpoints/ddpm_checkpoint_150', output_dir=output_dir)
+    #print("Inference finished. Congradulations!")
 
 if __name__ == '__main__':
     main()
