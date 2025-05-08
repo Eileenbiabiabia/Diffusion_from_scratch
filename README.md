@@ -39,23 +39,24 @@ Diffusion-Models-from-Scratch/
 ## 🚀 Getting Started
 
 ### Step 1: Setup
-
+<pre>
 git clone https://github.com/Eileenbiabiabia/Diffusion_from_scratch.git
 cd Diffusion_from_scratch
 conda env create -f environment.yml
 conda activate genai
-
+</pre>
 ### Step 2: Preprocessing
-
+<pre>
 Download the CelebA dataset and place images under ./data/img_align_celeba/
     You can find the CelebA dataset here: https://www.kaggle.com/datasets/jessicali9530/celeba-dataset
 Preprocess images using multiprocessing: 
 python preprocess.py
 Or you can submit a jobscript to allocate a 8 cpu per tasks on quest to train. 
 sbatch jobscript_preprocess.sh
-
+</pre>
 
 ### Step 3: Training
+<pre>
 You can submit a jobscript to allocate a A100/H100 on quest to train. 
 sbatch jobscript_train.sh
 
@@ -63,3 +64,4 @@ The model will:
 	•	Train on 30,000 CelebA samples by default
 	•	Save checkpoints every 10 epochs to checkpoints/
 	•	Output loss visualization to output/
+</pre>
