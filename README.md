@@ -16,6 +16,8 @@ This project implements diffusion-based generative models for image generation, 
 
 ## 📁 Project Structure
 Implementation of different diffusion models for image generation 
+<pre>
+```plaintext
 Diffusion-Models-from-Scratch/
 ├── checkpoints/
 ├── data/
@@ -30,7 +32,8 @@ Diffusion-Models-from-Scratch/
 ├── preprocess.py                 # CelebA image → tensor script
 ├── environment.yml              # Dependencies
 └── README.md
-
+```
+</pre>
 ---
 
 ## 🚀 Getting Started
